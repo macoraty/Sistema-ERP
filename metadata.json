@@ -1,0 +1,6 @@
+{
+  "name": "Macoraty Industrial ERP",
+  "description": "Sistema ERP industrial integrado completo com Planejamento de Necessidades de Materiais (MRP I), faturamento autônomo de Notas Fiscais (NF-e/SEFAZ), controle de estruturas de engenharia (BOM), almoxarifado de inventário físico e ledger financeiro.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

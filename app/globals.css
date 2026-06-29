@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+  }
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@media print {
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-force-light {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+  
+  .print-section, .print-section * {
+    visibility: visible;
+  }
+  
+  .print-section {
+    position: relative !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  
+  .print-hide, .print-hide * {
+    display: none !important;
+  }
+  
+  /* Additional print resets to ensure dark mode looks good when printed */
+  * {
+    color: black !important;
+    border-color: #d1d5db !important;
+  }
+  .bg-\\[\\#111827\\] { background: white !important; }
+  .bg-\\[\\#0f1523\\] { background: transparent !important; }
+  .text-white { color: black !important; }
+  .text-gray-300 { color: #374151 !important; }
+  .text-gray-400 { color: #4b5563 !important; }
+  .text-gray-500 { color: #6b7280 !important; }
+}
