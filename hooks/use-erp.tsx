@@ -15,6 +15,7 @@ import {
   Alert,
   User,
   CompanySettings,
+  DbProfile,
 } from "@/lib/types";
 import {
   getTodayFormatted,
@@ -36,6 +37,8 @@ interface ErpContextType {
   mrpRequirements: MrpRequirement[];
   alerts: Alert[];
   users: User[];
+  dbProfile: DbProfile;
+  setDbProfile: (profile: DbProfile) => void;
   companySettings: CompanySettings;
   setCompanySettings: (settings: CompanySettings) => void;
   purchaseNeeds: import("../lib/types").PurchaseNeed[];
@@ -506,7 +509,56 @@ const initialCompanySettings: CompanySettings = {
   email: "contato@macoraty.com"
 };
 
+let alertIdCounter = 10000;
+
 export function ErpProvider({ children }: { children: React.ReactNode }) {
+  const [dbProfile, setDbProfileState] = useState<DbProfile>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("erp_db_profile") as DbProfile;
+      if (
+        saved === "producao" ||
+        saved === "homologacao" ||
+        saved === "treinamento" ||
+        saved === "volatil"
+      ) {
+        return saved;
+      }
+    }
+    return "producao";
+  });
+
+  const getPrefixedKey = (key: string, profile: DbProfile) => {
+    if (profile === "volatil") return null;
+    if (profile === "homologacao") {
+      return `erp_homolog_${key.replace(/^erp_/, "")}`;
+    }
+    if (profile === "treinamento") {
+      return `erp_treino_${key.replace(/^erp_/, "")}`;
+    }
+    return key; // "producao" uses original key
+  };
+
+  // Toast notification state trigger (simple window log or alert, but let's do a custom visual notification trigger if we want or standard state)
+  const showToast = (msg: string) => {
+    alertIdCounter++;
+    // We add an alert block
+    const newAlert: Alert = {
+      id: alertIdCounter,
+      tipo: "success",
+      mensagem: msg,
+      data: getTodayFormatted(),
+    };
+    setAlerts((prev) => [newAlert, ...prev]);
+  };
+
+  const setDbProfile = (profile: DbProfile) => {
+    setDbProfileState(profile);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("erp_db_profile", profile);
+    }
+    showToast(`Perfil de banco de dados alterado para: ${profile.toUpperCase()}`);
+  };
+
   const [users, setUsers] = useState<User[]>([]);
   const [companySettings, setCompanySettingsState] = useState<CompanySettings>(initialCompanySettings);
   const [products, setProducts] = useState<Product[]>([]);
@@ -536,54 +588,61 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
 
   const setAppLogo = (logo: string | null) => {
     setAppLogoState(logo);
-    if (logo) {
-      localStorage.setItem("erp_appLogo", logo);
-    } else {
-      localStorage.removeItem("erp_appLogo");
+    const prefixedKey = getPrefixedKey("erp_appLogo", dbProfile);
+    if (prefixedKey) {
+      if (logo) {
+        localStorage.setItem(prefixedKey, logo);
+      } else {
+        localStorage.removeItem(prefixedKey);
+      }
     }
   };
 
   const setPrintTemplate = (key: string, html: string) => {
     const next = { ...printTemplates, [key]: html };
     setPrintTemplates(next);
-    localStorage.setItem("erp_printTemplates", JSON.stringify(next));
-  };
-
-  // Toast notification state trigger (simple window log or alert, but let's do a custom visual notification trigger if we want or standard state)
-  const showToast = (msg: string) => {
-    // We add an alert block
-    const newAlert: Alert = {
-      id: Date.now() + Math.random(),
-      tipo: "success",
-      mensagem: msg,
-      data: getTodayFormatted(),
-    };
-    setAlerts((prev) => [newAlert, ...prev]);
+    const prefixedKey = getPrefixedKey("erp_printTemplates", dbProfile);
+    if (prefixedKey) {
+      localStorage.setItem(prefixedKey, JSON.stringify(next));
+    }
   };
 
   // Load from local storage
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    const localProducts = localStorage.getItem("erp_products");
-    const localBom = localStorage.getItem("erp_bom");
-    const localContacts = localStorage.getItem("erp_contacts");
-    const localSalesOrders = localStorage.getItem("erp_salesOrders");
-    const localStock = localStorage.getItem("erp_stock");
-    const localFinancial = localStorage.getItem("erp_financial");
-    const localPurchase = localStorage.getItem("erp_purchaseOrders");
-    const localEntryInvoices = localStorage.getItem("erp_entryInvoices");
-    const localOutboundInvoices = localStorage.getItem("erp_outboundInvoices");
-    const localMrp = localStorage.getItem("erp_mrp");
-    const localAlerts = localStorage.getItem("erp_alerts");
-    const localUsers = localStorage.getItem("erp_users");
-    const localPurchaseNeeds = localStorage.getItem("erp_purchaseNeeds");
-    const localQuotes = localStorage.getItem("erp_quotes");
-    const localCompanySettings = localStorage.getItem("erp_companySettings");
+    const getLocal = (key: string) => {
+      const prefixed = getPrefixedKey(key, dbProfile);
+      return prefixed ? localStorage.getItem(prefixed) : null;
+    };
 
-    if (localCompanySettings) setCompanySettingsState(JSON.parse(localCompanySettings));
-    else {
+    const saveLocal = (key: string, value: any) => {
+      const prefixed = getPrefixedKey(key, dbProfile);
+      if (prefixed) {
+        localStorage.setItem(prefixed, JSON.stringify(value));
+      }
+    };
+
+    const localProducts = getLocal("erp_products");
+    const localBom = getLocal("erp_bom");
+    const localContacts = getLocal("erp_contacts");
+    const localSalesOrders = getLocal("erp_salesOrders");
+    const localStock = getLocal("erp_stock");
+    const localFinancial = getLocal("erp_financial");
+    const localPurchase = getLocal("erp_purchaseOrders");
+    const localEntryInvoices = getLocal("erp_entryInvoices");
+    const localOutboundInvoices = getLocal("erp_outboundInvoices");
+    const localMrp = getLocal("erp_mrp");
+    const localAlerts = getLocal("erp_alerts");
+    const localUsers = getLocal("erp_users");
+    const localPurchaseNeeds = getLocal("erp_purchaseNeeds");
+    const localQuotes = getLocal("erp_quotes");
+    const localCompanySettings = getLocal("erp_companySettings");
+
+    if (localCompanySettings) {
+      setCompanySettingsState(JSON.parse(localCompanySettings));
+    } else {
       setCompanySettingsState(initialCompanySettings);
-      localStorage.setItem("erp_companySettings", JSON.stringify(initialCompanySettings));
+      saveLocal("erp_companySettings", initialCompanySettings);
     }
 
     if (localProducts) {
@@ -599,133 +658,162 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
           }
         });
         setProducts(merged);
-        localStorage.setItem("erp_products", JSON.stringify(merged));
+        saveLocal("erp_products", merged);
       } else {
         setProducts(parsed);
       }
     } else {
       setProducts(initialProducts);
-      localStorage.setItem("erp_products", JSON.stringify(initialProducts));
+      saveLocal("erp_products", initialProducts);
     }
 
-    if (localBom) setBom(JSON.parse(localBom));
-    else {
+    if (localBom) {
+      setBom(JSON.parse(localBom));
+    } else {
       setBom(initialBom);
-      localStorage.setItem("erp_bom", JSON.stringify(initialBom));
+      saveLocal("erp_bom", initialBom);
     }
 
-    if (localContacts) setContacts(JSON.parse(localContacts));
-    else {
+    if (localContacts) {
+      setContacts(JSON.parse(localContacts));
+    } else {
       setContacts(initialContacts);
-      localStorage.setItem("erp_contacts", JSON.stringify(initialContacts));
+      saveLocal("erp_contacts", initialContacts);
     }
 
-    if (localSalesOrders) setSalesOrders(JSON.parse(localSalesOrders));
-    else {
+    if (localSalesOrders) {
+      setSalesOrders(JSON.parse(localSalesOrders));
+    } else {
       setSalesOrders(initialSalesOrders);
-      localStorage.setItem(
-        "erp_salesOrders",
-        JSON.stringify(initialSalesOrders),
-      );
+      saveLocal("erp_salesOrders", initialSalesOrders);
     }
 
-    if (localStock) setStock(JSON.parse(localStock));
-    else {
+    if (localStock) {
+      setStock(JSON.parse(localStock));
+    } else {
       setStock(initialStock);
-      localStorage.setItem("erp_stock", JSON.stringify(initialStock));
+      saveLocal("erp_stock", initialStock);
     }
 
-    if (localFinancial) setFinancialEntries(JSON.parse(localFinancial));
-    else {
+    if (localFinancial) {
+      setFinancialEntries(JSON.parse(localFinancial));
+    } else {
       setFinancialEntries(initialFinancial);
-      localStorage.setItem("erp_financial", JSON.stringify(initialFinancial));
+      saveLocal("erp_financial", initialFinancial);
     }
 
-    if (localPurchase) setPurchaseOrders(JSON.parse(localPurchase));
-    else {
+    if (localPurchase) {
+      setPurchaseOrders(JSON.parse(localPurchase));
+    } else {
       setPurchaseOrders(initialPurchaseOrders);
-      localStorage.setItem(
-        "erp_purchaseOrders",
-        JSON.stringify(initialPurchaseOrders),
-      );
+      saveLocal("erp_purchaseOrders", initialPurchaseOrders);
     }
 
-    if (localEntryInvoices) setEntryInvoices(JSON.parse(localEntryInvoices));
-    else {
+    if (localEntryInvoices) {
+      setEntryInvoices(JSON.parse(localEntryInvoices));
+    } else {
       setEntryInvoices(initialEntryInvoices);
-      localStorage.setItem(
-        "erp_entryInvoices",
-        JSON.stringify(initialEntryInvoices),
-      );
+      saveLocal("erp_entryInvoices", initialEntryInvoices);
     }
 
-    if (localOutboundInvoices)
+    if (localOutboundInvoices) {
       setOutboundInvoices(JSON.parse(localOutboundInvoices));
-    else {
+    } else {
       setOutboundInvoices(initialOutboundInvoices);
-      localStorage.setItem(
-        "erp_outboundInvoices",
-        JSON.stringify(initialOutboundInvoices),
-      );
+      saveLocal("erp_outboundInvoices", initialOutboundInvoices);
     }
 
-    if (localMrp) setMrpRequirements(JSON.parse(localMrp));
-    else {
+    if (localMrp) {
+      setMrpRequirements(JSON.parse(localMrp));
+    } else {
       setMrpRequirements(initialMrp);
-      localStorage.setItem("erp_mrp", JSON.stringify(initialMrp));
+      saveLocal("erp_mrp", initialMrp);
     }
 
-    if (localAlerts) setAlerts(JSON.parse(localAlerts));
-    else {
+    if (localAlerts) {
+      setAlerts(JSON.parse(localAlerts));
+    } else {
       setAlerts(initialAlerts);
-      localStorage.setItem("erp_alerts", JSON.stringify(initialAlerts));
+      saveLocal("erp_alerts", initialAlerts);
     }
 
-    if (localUsers) setUsers(JSON.parse(localUsers));
-    else {
+    if (localUsers) {
+      setUsers(JSON.parse(localUsers));
+    } else {
       setUsers(initialUsers);
-      localStorage.setItem("erp_users", JSON.stringify(initialUsers));
+      saveLocal("erp_users", initialUsers);
     }
 
-    if (localPurchaseNeeds) setPurchaseNeeds(JSON.parse(localPurchaseNeeds));
-    if (localQuotes) setQuotes(JSON.parse(localQuotes));
+    if (localPurchaseNeeds) {
+      setPurchaseNeeds(JSON.parse(localPurchaseNeeds));
+    } else {
+      setPurchaseNeeds([]);
+    }
 
-    const localUnidades = localStorage.getItem("erp_unidadesMedida");
-    if (localUnidades) setUnidadesMedida(JSON.parse(localUnidades));
-    else {
+    if (localQuotes) {
+      setQuotes(JSON.parse(localQuotes));
+    } else {
+      setQuotes([]);
+    }
+
+    const localUnidades = getLocal("erp_unidadesMedida");
+    if (localUnidades) {
+      setUnidadesMedida(JSON.parse(localUnidades));
+    } else {
       setUnidadesMedida(initialUnidadesMedida);
-      localStorage.setItem(
-        "erp_unidadesMedida",
-        JSON.stringify(initialUnidadesMedida),
-      );
+      saveLocal("erp_unidadesMedida", initialUnidadesMedida);
     }
 
-    const localLogo = localStorage.getItem("erp_appLogo");
-    if (localLogo) setAppLogoState(localLogo);
+    const prefixedLogoKey = getPrefixedKey("erp_appLogo", dbProfile);
+    const localLogo = prefixedLogoKey ? localStorage.getItem(prefixedLogoKey) : null;
+    if (localLogo) {
+      setAppLogoState(localLogo);
+    } else {
+      setAppLogoState(null);
+    }
 
-    const localTemplates = localStorage.getItem("erp_printTemplates");
-    if (localTemplates) setPrintTemplates(JSON.parse(localTemplates));
-  }, []);
+    const prefixedTemplatesKey = getPrefixedKey("erp_printTemplates", dbProfile);
+    const localTemplates = prefixedTemplatesKey ? localStorage.getItem(prefixedTemplatesKey) : null;
+    if (localTemplates) {
+      setPrintTemplates(JSON.parse(localTemplates));
+    } else {
+      setPrintTemplates({});
+    }
+  }, [dbProfile]);
 
   // Update localStorage helper
   const saveState = (key: string, data: any, setter: Function) => {
     setter(data);
-    localStorage.setItem(key, JSON.stringify(data));
+    const prefixedKey = getPrefixedKey(key, dbProfile);
+    if (prefixedKey) {
+      localStorage.setItem(prefixedKey, JSON.stringify(data));
+    }
   };
 
   const resetDatabase = () => {
-    localStorage.removeItem("erp_products");
-    localStorage.removeItem("erp_bom");
-    localStorage.removeItem("erp_contacts");
-    localStorage.removeItem("erp_salesOrders");
-    localStorage.removeItem("erp_stock");
-    localStorage.removeItem("erp_financial");
-    localStorage.removeItem("erp_purchaseOrders");
-    localStorage.removeItem("erp_entryInvoices");
-    localStorage.removeItem("erp_outboundInvoices");
-    localStorage.removeItem("erp_mrp");
-    localStorage.removeItem("erp_alerts");
-    localStorage.removeItem("erp_unidadesMedida");
+    const removeLocal = (key: string) => {
+      const prefixed = getPrefixedKey(key, dbProfile);
+      if (prefixed) localStorage.removeItem(prefixed);
+    };
+
+    removeLocal("erp_products");
+    removeLocal("erp_bom");
+    removeLocal("erp_contacts");
+    removeLocal("erp_salesOrders");
+    removeLocal("erp_stock");
+    removeLocal("erp_financial");
+    removeLocal("erp_purchaseOrders");
+    removeLocal("erp_entryInvoices");
+    removeLocal("erp_outboundInvoices");
+    removeLocal("erp_mrp");
+    removeLocal("erp_alerts");
+    removeLocal("erp_unidadesMedida");
+    removeLocal("erp_users");
+    removeLocal("erp_purchaseNeeds");
+    removeLocal("erp_quotes");
+    removeLocal("erp_companySettings");
+    removeLocal("erp_appLogo");
+    removeLocal("erp_printTemplates");
 
     setProducts(initialProducts);
     setBom(initialBom);
@@ -739,6 +827,12 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     setMrpRequirements([]);
     setAlerts(initialAlerts);
     setUnidadesMedida(initialUnidadesMedida);
+    setUsers(initialUsers);
+    setPurchaseNeeds([]);
+    setQuotes([]);
+    setCompanySettingsState(initialCompanySettings);
+    setAppLogoState(null);
+    setPrintTemplates({});
     showToast("Banco de dados local reinicializado com sucesso!");
   };
 
@@ -2437,6 +2531,8 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
         purchaseNeeds,
         quotes,
         unidadesMedida,
+        dbProfile,
+        setDbProfile,
 
         saveProduct,
         deleteProduct,

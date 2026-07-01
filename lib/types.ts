@@ -172,3 +172,5 @@ export interface CompanySettings {
   phone: string;
   email: string;
 }
+
+export type DbProfile = "producao" | "homologacao" | "treinamento" | "volatil";

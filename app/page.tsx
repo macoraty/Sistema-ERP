@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useErp } from "@/hooks/use-erp";
 import {
   Cpu,
@@ -50,29 +50,25 @@ import AnalyticsView from "@/components/AnalyticsView";
 export default function Page() {
   const { alerts, clearAlerts, stock, mrpRequirements, appLogo, users } =
     useErp();
+  const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("erp_sidebar_collapsed") === "true";
-    }
-    return false;
-  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authUsername, setAuthUsername] = useState<string | null>(null);
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("erp_auth") === "true";
-    }
-    return false;
-  });
-  
-  const [authUsername, setAuthUsername] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("erp_auth_user");
-    }
-    return null;
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+      if (typeof window !== "undefined") {
+        setIsSidebarCollapsed(localStorage.getItem("erp_sidebar_collapsed") === "true");
+        setIsAuthenticated(localStorage.getItem("erp_auth") === "true");
+        setAuthUsername(localStorage.getItem("erp_auth_user"));
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -241,6 +237,20 @@ export default function Page() {
 
   const ActiveComponent =
     menuItems.find((item) => item.name === activeTab)?.view || DashboardView;
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-[#0b0f17] flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center">
+          <Cpu className="w-12 h-12 text-blue-500 mb-4 animate-spin" />
+          <span className="font-mono text-xl font-black tracking-widest text-white">
+            MACORATY<b className="text-blue-500">.ERP</b>
+          </span>
+          <p className="text-xs text-gray-400 mt-2">Carregando ambiente...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
