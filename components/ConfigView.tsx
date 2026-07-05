@@ -1114,6 +1114,27 @@ export default function ConfigView() {
     }
   };
 
+  const loggedInUser = typeof window !== "undefined"
+    ? users.find((u) => u.username === localStorage.getItem("erp_auth_user"))
+    : null;
+  const isCurrentUserAdmin = loggedInUser?.isAdmin || false;
+
+  if (!isCurrentUserAdmin) {
+    return (
+      <div className="bg-[#111827] border border-[#1f293d] rounded-xl p-8 text-center space-y-4 font-sans animate-fade-in" id="config-access-denied">
+        <div className="max-w-md mx-auto space-y-3">
+          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-rose-500" />
+          </div>
+          <h3 className="text-lg font-bold text-white uppercase tracking-wider">Acesso Restrito ao Administrador</h3>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Esta área de Configuração do ERP contém definições críticas de banco de dados, armazenamento físico local, gerenciamento de usuários e padrões do sistema. Apenas usuários com privilégios de <strong>Administrador</strong> têm permissão para visualizar ou modificar essas informações.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 font-sans animate-fade-in" id="config-view">
       {/* Database & Storage Tabbed Configuration Card */}

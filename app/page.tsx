@@ -82,6 +82,7 @@ export default function Page() {
     if (user) {
       setIsAuthenticated(true);
       setAuthUsername(user.username);
+      setActiveTab("Dashboard");
       setLoginError("");
       if (typeof window !== "undefined") {
         localStorage.setItem("erp_auth", "true");
@@ -99,6 +100,7 @@ export default function Page() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setAuthUsername(null);
+    setActiveTab("Dashboard");
     if (typeof window !== "undefined") {
       localStorage.removeItem("erp_auth");
       localStorage.removeItem("erp_auth_user");
@@ -224,6 +226,9 @@ export default function Page() {
   const isCurrentUserAdmin = currentUser?.isAdmin || false;
   
   const menuItems = allMenuItems.filter(item => {
+    if (item.name === "Configurações ERP") {
+      return isCurrentUserAdmin;
+    }
     if (isCurrentUserAdmin) return true;
     if (item.name === "Dashboard") return true; // Everyone sees Dashboard
     if (item.name === "Manual do Sistema") return true; // Everyone sees Manual
