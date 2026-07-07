@@ -171,54 +171,7 @@ export default function PurchaseQuotesView() {
 
   const handlePdfUpload = async (file: File) => {
     setPdfName(file.name);
-    setIsParsingPdf(true);
-    setParsingStep("Lendo arquivo...");
-
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(file);
-      });
-
-      setParsingStep("Analisando com Inteligência Artificial...");
-      const response = await fetch("/api/parse-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileBase64: base64,
-          mimeType: file.type || "application/pdf",
-          products: products,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro na resposta do servidor.");
-      }
-
-      const data = await response.json();
-      if (data.items && Array.isArray(data.items)) {
-        setParsingStep("Mapeando itens com catálogo...");
-        
-        const extractedItens = data.items.map((item: any) => ({
-          prodId: Number(item.prodId),
-          qtd: Number(item.qtd),
-          valorUnitario: Number(item.valorUnitario),
-        }));
-
-        setBasket(extractedItens);
-        setParsingStep("Concluído!");
-      } else {
-        throw new Error("Formato de resposta inválido.");
-      }
-    } catch (err) {
-      console.error("Erro ao analisar arquivo:", err);
-      alert("Não foi possível analisar o arquivo automaticamente usando IA. Mas você pode adicionar os itens manualmente logo abaixo!");
-    } finally {
-      setIsParsingPdf(false);
-      setParsingStep("");
-    }
+    alert("Recurso de IA desativado conforme solicitado.");
   };
 
   const handleDragOver = (e: React.DragEvent) => {

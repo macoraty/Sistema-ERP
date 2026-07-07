@@ -120,55 +120,7 @@ export default function PurchaseOrdersView() {
 
   const handleQuotePdfUpload = async (file: File) => {
     setQuotePdfName(file.name);
-    setIsParsingQuote(true);
-    setParsingQuoteStep("Lendo arquivo...");
-
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(file);
-      });
-      setQuotePdfBase64(base64);
-
-      setParsingQuoteStep("Analisando com Inteligência Artificial...");
-      const response = await fetch("/api/parse-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileBase64: base64,
-          mimeType: file.type || "application/pdf",
-          products: products,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro na resposta do servidor.");
-      }
-
-      const data = await response.json();
-      if (data.items && Array.isArray(data.items)) {
-        setParsingQuoteStep("Mapeando itens com catálogo...");
-        
-        const extractedItens = data.items.map((item: any) => ({
-          prodId: Number(item.prodId),
-          qtd: Number(item.qtd),
-          valorUnitario: Number(item.valorUnitario),
-        }));
-
-        setQuoteBasket(extractedItens);
-        setParsingQuoteStep("Concluído!");
-      } else {
-        throw new Error("Formato de resposta inválido.");
-      }
-    } catch (err) {
-      console.error("Erro ao analisar arquivo:", err);
-      alert("Não foi possível analisar o arquivo automaticamente usando IA. Mas você pode adicionar os itens manualmente!");
-    } finally {
-      setIsParsingQuote(false);
-      setParsingQuoteStep("");
-    }
+    alert("Recurso de IA desativado conforme solicitado.");
   };
 
   const handleQuoteSubmit = (e: React.FormEvent) => {
@@ -609,101 +561,7 @@ ${itemsXml}${extraXml}
 
   const handleNewOrderPdfUpload = async (file: File) => {
     setNewOrderPdfName(file.name);
-    setIsParsingNewOrderPdf(true);
-    setParsingNewOrderPdfStep('Lendo arquivo...');
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(file);
-      });
-      setNewOrderPdfBase64(base64);
-
-      setParsingNewOrderPdfStep('Analisando com Inteligência Artificial...');
-      const response = await fetch("/api/parse-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileBase64: base64,
-          mimeType: file.type || "application/pdf",
-          products: products,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro na resposta do servidor.");
-      }
-
-      const data = await response.json();
-      if (data.items && Array.isArray(data.items)) {
-        setParsingNewOrderPdfStep('Mapeando e cadastrando produtos...');
-        
-        let currentProducts = [...products];
-        const newBasketItems: typeof basket = [];
-
-        for (const item of data.items) {
-          let pId = Number(item.prodId);
-          
-          if (item.isNew || !pId) {
-            // Check if we already registered a product with this code in this run
-            let existingInLoop = currentProducts.find(
-              p => p.codigo.toLowerCase() === (item.codigo || "").toLowerCase()
-            );
-            if (!existingInLoop) {
-              const newId = currentProducts.length > 0 
-                ? Math.max(...currentProducts.map(p => p.id)) + 1 
-                : 1;
-              const newProd: Product = {
-                id: newId,
-                codigo: item.codigo || `IN-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-                descricao: item.descricao || "Item Importado via AI",
-                tipo: 'Insumo',
-                unidade: item.unidade || 'UN',
-                valor: Number(item.valorUnitario) || 0,
-                leadTime: 3
-              };
-              saveProduct(newProd);
-              currentProducts.push(newProd);
-              existingInLoop = newProd;
-            }
-            pId = existingInLoop.id;
-          }
-
-          // Add to list of items for basket
-          newBasketItems.push({
-            prodId: pId,
-            qtd: Number(item.qtd),
-            valorUnitario: Number(item.valorUnitario)
-          });
-        }
-
-        // Merge and set basket
-        setBasket(prev => {
-          const merged = [...prev];
-          for (const newItem of newBasketItems) {
-            const existingIdx = merged.findIndex(i => i.prodId === newItem.prodId);
-            if (existingIdx !== -1) {
-              merged[existingIdx].qtd += newItem.qtd;
-              merged[existingIdx].valorUnitario = newItem.valorUnitario;
-            } else {
-              merged.push(newItem);
-            }
-          }
-          return merged;
-        });
-
-        alert("Orçamento analisado com Inteligência Artificial! Itens adicionados ao carrinho.");
-      } else {
-        throw new Error("Nenhum item detectado no documento.");
-      }
-    } catch (err: any) {
-      console.error("Erro ao analisar arquivo:", err);
-      alert("Não foi possível analisar o arquivo com Inteligência Artificial: " + (err.message || ""));
-    } finally {
-      setIsParsingNewOrderPdf(false);
-      setParsingNewOrderPdfStep('');
-    }
+    alert("Recurso de IA desativado conforme solicitado.");
   };
 
   const handleProductChange = (prodId: number) => {

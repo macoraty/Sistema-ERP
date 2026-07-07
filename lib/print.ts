@@ -19,7 +19,7 @@ export const triggerPrint = (title: string = 'Documento', templateHtml?: string)
 
     htmlContent = `
       <!DOCTYPE html>
-      <html lang="pt-BR">
+      <` + `html lang="pt-BR">
         <head>
           <meta charset="UTF-8">
           <title>${title}</title>
@@ -59,7 +59,7 @@ export const triggerPrint = (title: string = 'Documento', templateHtml?: string)
             };
           </script>
         </body>
-      </html>
+      </` + `html>
     `;
   }
 

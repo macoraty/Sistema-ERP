@@ -135,7 +135,7 @@ export default function OutboundInvoicesView() {
       tpl = printTemplates['receipt'];
     } else {
       tpl = `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>Recibo de Faturamento</title>
@@ -291,7 +291,7 @@ export default function OutboundInvoicesView() {
     </div>
   </div>
 </body>
-</html>`;
+</` + `html>`;
     }
 
     const contact = contacts.find(c => c.id === invoice.clienteId);

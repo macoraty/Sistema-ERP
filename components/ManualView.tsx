@@ -31,7 +31,7 @@ export default function ManualView() {
 
   const templatesExamples = {
     salesOrder: `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>Pedido de Venda</title>
@@ -226,9 +226,9 @@ export default function ManualView() {
     </div>
   </div>
 </body>
-</html>`,
+</` + `html>`,
     purchaseOrder: `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>Pedido de Compra</title>
@@ -423,9 +423,9 @@ export default function ManualView() {
     </div>
   </div>
 </body>
-</html>`,
+</` + `html>`,
     outboundInvoice: `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>DANFE - Documento Auxiliar da Nota Fiscal Eletrônica</title>
@@ -645,7 +645,7 @@ export default function ManualView() {
     </div>
   </div>
 </body>
-</html>`
+</` + `html>`
   };
 
   return (

@@ -304,7 +304,7 @@ export default function ConfigView() {
   const getTemplateDownload = (type: string) => {
     if (type === "salesOrder") {
       return `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>Pedido de Venda</title>
@@ -498,12 +498,12 @@ export default function ConfigView() {
     </div>
   </div>
 </body>
-</html>`;
+</` + `html>`;
     }
 
     if (type === "purchaseOrder") {
       return `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>Pedido de Compra</title>
@@ -698,12 +698,12 @@ export default function ConfigView() {
     </div>
   </div>
 </body>
-</html>`;
+</` + `html>`;
     }
 
     if (type === "receipt") {
       return `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>Recibo de Faturamento</title>
@@ -859,11 +859,11 @@ export default function ConfigView() {
     </div>
   </div>
 </body>
-</html>`;
+</` + `html>`;
     }
 
     return `<!DOCTYPE html>
-<html lang="pt-BR">
+<` + `html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>DANFE - Documento Auxiliar da Nota Fiscal Eletrônica</title>
@@ -1083,7 +1083,7 @@ export default function ConfigView() {
     </div>
   </div>
 </body>
-</html>`;
+</` + `html>`;
   };
 
   const handleDownloadTemplate = (type: string) => {
