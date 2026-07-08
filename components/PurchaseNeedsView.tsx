@@ -52,10 +52,26 @@ export default function PurchaseNeedsView() {
   const [qtd, setQtd] = useState("");
 
   // Convert Need to Purchase Order Modal State
-  const [generatingOrderNeed, setGeneratingOrderNeed] = useState<PurchaseNeed | null>(null);
+  const [generatingOrderNeeds, setGeneratingOrderNeeds] = useState<PurchaseNeed[] | null>(null);
   const [fornecedorId, setFornecedorId] = useState<number>(0);
   const [dataEntregaOrder, setDataEntregaOrder] = useState("");
   const [itemPrices, setItemPrices] = useState<Record<number, string>>({}); // mapped prodId -> price string
+  const [selectedNeedIds, setSelectedNeedIds] = useState<number[]>([]);
+
+  // Merge items from all currently generating purchase needs
+  const mergedItens = useMemo(() => {
+    if (!generatingOrderNeeds) return [];
+    const itemMap: Record<number, number> = {};
+    generatingOrderNeeds.forEach(need => {
+      need.itens.forEach(item => {
+        itemMap[item.prodId] = (itemMap[item.prodId] || 0) + item.qtd;
+      });
+    });
+    return Object.entries(itemMap).map(([prodId, qtd]) => ({
+      prodId: Number(prodId),
+      qtd
+    }));
+  }, [generatingOrderNeeds]);
 
   // Sorting State
   const [sortField, setSortField] = useState<string | null>(null);
@@ -125,9 +141,10 @@ export default function PurchaseNeedsView() {
     setIsModalOpen(true);
   };
 
-  // Open modal for generating purchase order from need
-  const handleOpenOrderGenModal = (need: PurchaseNeed) => {
-    setGeneratingOrderNeed(need);
+  // Open modal for generating purchase order from need(s)
+  const handleOpenOrderGenModal = (needs: PurchaseNeed | PurchaseNeed[]) => {
+    const needsArray = Array.isArray(needs) ? needs : [needs];
+    setGeneratingOrderNeeds(needsArray);
     if (suppliers.length > 0) {
       setFornecedorId(suppliers[0].id);
     }
@@ -142,9 +159,13 @@ export default function PurchaseNeedsView() {
 
     // Pre-populate prices dictionary
     const prices: Record<number, string> = {};
-    need.itens.forEach(item => {
-      const p = products.find(prod => prod.id === item.prodId);
-      prices[item.prodId] = String(p?.valor || 0);
+    needsArray.forEach(need => {
+      need.itens.forEach(item => {
+        if (!prices[item.prodId]) {
+          const p = products.find(prod => prod.id === item.prodId);
+          prices[item.prodId] = String(p?.valor || 0);
+        }
+      });
     });
     setItemPrices(prices);
   };
@@ -207,7 +228,7 @@ export default function PurchaseNeedsView() {
   // Convert Need list to real Purchase Order
   const handleConfirmPurchaseOrder = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!generatingOrderNeed) return;
+    if (!generatingOrderNeeds || generatingOrderNeeds.length === 0) return;
     if (!fornecedorId) {
       alert("Por favor, selecione um fornecedor.");
       return;
@@ -217,8 +238,8 @@ export default function PurchaseNeedsView() {
     const dParts = dataEntregaOrder.split("-");
     const formattedDelivery = `${dParts[2]}/${dParts[1]}/${dParts[0]}`;
 
-    // Map cart items with pricing entered
-    const orderItems = generatingOrderNeed.itens.map(item => ({
+    // Map merged items with pricing entered
+    const orderItems = mergedItens.map(item => ({
       prodId: item.prodId,
       qtd: item.qtd,
       valorUnitario: Number(itemPrices[item.prodId] || 0)
@@ -237,13 +258,16 @@ export default function PurchaseNeedsView() {
       status: 'Aberto'
     });
 
-    // Mark current Purchase Need as "Cotado" (Historical)
-    savePurchaseNeed({
-      ...generatingOrderNeed,
-      status: 'Cotado'
+    // Mark current Purchase Need(s) as "Cotado" (Historical/Processed)
+    generatingOrderNeeds.forEach(need => {
+      savePurchaseNeed({
+        ...need,
+        status: 'Cotado'
+      });
     });
 
-    setGeneratingOrderNeed(null);
+    setGeneratingOrderNeeds(null);
+    setSelectedNeedIds([]);
   };
 
   const handlePrintNeed = (need: PurchaseNeed) => {
@@ -311,6 +335,36 @@ export default function PurchaseNeedsView() {
     return list;
   }, [purchaseNeeds, selectedStatus, searchTerm, sortField, sortDirection, products]);
 
+  // Helper functions for selection of needs
+  const selectableNeeds = useMemo(() => {
+    return filteredNeeds.filter(n => n.status !== "Cotado");
+  }, [filteredNeeds]);
+
+  const toggleSelectNeed = (id: number) => {
+    setSelectedNeedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllToggle = () => {
+    const selectableIds = selectableNeeds.map(n => n.id);
+    const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedNeedIds.includes(id));
+
+    if (allSelected) {
+      setSelectedNeedIds(prev => prev.filter(id => !selectableIds.includes(id)));
+    } else {
+      setSelectedNeedIds(prev => {
+        const next = [...prev];
+        selectableIds.forEach(id => {
+          if (!next.includes(id)) {
+            next.push(id);
+          }
+        });
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans animate-fade-in" id="purchase-needs-view-root">
       
@@ -325,13 +379,29 @@ export default function PurchaseNeedsView() {
             Planeje compras de insumos para manufatura e gere pedidos de compras integrados.
           </p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center space-x-2 transition-colors shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nova Lista de Necessidades</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {selectedNeedIds.length > 0 && (
+            <button
+              onClick={() => {
+                const selectedNeeds = purchaseNeeds.filter(n => selectedNeedIds.includes(n.id) && n.status !== "Cotado");
+                if (selectedNeeds.length > 0) {
+                  handleOpenOrderGenModal(selectedNeeds);
+                }
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center space-x-2 transition-colors shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Gerar Pedido dos Selecionados ({selectedNeedIds.length})</span>
+            </button>
+          )}
+          <button
+            onClick={handleOpenAddModal}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center space-x-2 transition-colors shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nova Lista de Necessidades</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters bar */}
@@ -355,6 +425,14 @@ export default function PurchaseNeedsView() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-[#0f1523] border-b border-[#1f293d] text-gray-400 font-bold tracking-wider uppercase text-[10px]">
+                <th className="py-3 px-4 text-center select-none" style={{ width: '50px' }}>
+                  <input 
+                    type="checkbox"
+                    checked={selectableNeeds.length > 0 && selectableNeeds.every(n => selectedNeedIds.includes(n.id))}
+                    onChange={handleSelectAllToggle}
+                    className="rounded border-[#1f293d] bg-[#0b0f17] text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer w-4 h-4"
+                  />
+                </th>
                 <th 
                   onClick={() => toggleSort("id")} 
                   className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
@@ -421,6 +499,22 @@ export default function PurchaseNeedsView() {
 
                 return (
                   <tr key={need.id} className="hover:bg-gray-800/20 transition-colors">
+                    <td className="py-3.5 px-4 text-center select-none">
+                      {need.status !== "Cotado" ? (
+                        <input 
+                          type="checkbox"
+                          checked={selectedNeedIds.includes(need.id)}
+                          onChange={() => toggleSelectNeed(need.id)}
+                          className="rounded border-[#1f293d] bg-[#0b0f17] text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer w-4 h-4"
+                        />
+                      ) : (
+                        <input 
+                          type="checkbox"
+                          disabled
+                          className="rounded border-[#1f293d] bg-[#0b0f17] opacity-20 cursor-not-allowed w-4 h-4"
+                        />
+                      )}
+                    </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-white text-[11px]">
                       <div>#{need.id}</div>
                       {need.nomeReferencia && (
@@ -516,7 +610,7 @@ export default function PurchaseNeedsView() {
 
               {filteredNeeds.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-500 italic font-semibold">
+                  <td colSpan={6} className="py-12 text-center text-gray-500 italic font-semibold">
                     Nenhuma lista de necessidades encontrada correspondente aos filtros.
                   </td>
                 </tr>
@@ -767,10 +861,10 @@ export default function PurchaseNeedsView() {
       )}
 
       {/* CONVERT NEED TO PURCHASE ORDER MODAL */}
-      {generatingOrderNeed && (
+      {generatingOrderNeeds && generatingOrderNeeds.length > 0 && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setGeneratingOrderNeed(null) }}
+          onClick={(e) => { if (e.target === e.currentTarget) setGeneratingOrderNeeds(null) }}
         >
           <div className="bg-[#111827] border border-[#1f293d] rounded-xl w-full max-w-3xl overflow-visible shadow-2xl animate-scale-up">
             
@@ -778,9 +872,13 @@ export default function PurchaseNeedsView() {
             <div className="bg-[#0f1523] px-5 py-4 flex justify-between items-center border-b border-[#1f293d] rounded-t-xl">
               <h3 className="font-bold text-sm text-white flex items-center space-x-2">
                 <ShoppingBag className="w-4 h-4 text-blue-400" />
-                <span>Gerar Pedido de Compra (a partir da Necessidade #{generatingOrderNeed.id})</span>
+                <span>
+                  {generatingOrderNeeds.length === 1 
+                    ? `Gerar Pedido de Compra (a partir da Necessidade #${generatingOrderNeeds[0].id})` 
+                    : `Gerar Pedido de Compra Coletivo (${generatingOrderNeeds.length} necessidades selecionadas)`}
+                </span>
               </h3>
-              <button onClick={() => setGeneratingOrderNeed(null)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setGeneratingOrderNeeds(null)} className="text-gray-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -816,7 +914,7 @@ export default function PurchaseNeedsView() {
               <div className="bg-[#0b0f17] p-4 rounded-xl border border-[#1f293d] space-y-3">
                 <h4 className="font-bold text-white text-xs flex items-center space-x-2 border-b border-[#1f293d]/50 pb-2">
                   <Check className="w-4 h-4 text-blue-400" />
-                  <span>Definir Preços Unitários dos Itens</span>
+                  <span>Definir Preços Unitários dos Itens Consolidados</span>
                 </h4>
 
                 <div className="overflow-x-auto">
@@ -825,13 +923,13 @@ export default function PurchaseNeedsView() {
                       <tr className="border-b border-[#1f293d]/50 text-gray-500 uppercase font-black text-[9px]">
                         <th className="py-2">Insumo</th>
                         <th className="py-2 text-center">Unidade</th>
-                        <th className="py-2 text-right">Qtd</th>
+                        <th className="py-2 text-right">Qtd Total</th>
                         <th className="py-2 text-center" style={{ width: '130px' }}>Unitário (R$)</th>
                         <th className="py-2 text-right">Subtotal</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1f293d]/30 text-gray-300">
-                      {generatingOrderNeed.itens.map((item, index) => {
+                      {mergedItens.map((item, index) => {
                         const p = products.find(prod => prod.id === item.prodId);
                         const pValStr = itemPrices[item.prodId] || "0";
                         const subVal = item.qtd * Number(pValStr);
@@ -873,7 +971,7 @@ export default function PurchaseNeedsView() {
                 <div className="flex justify-end items-center space-x-3 pt-3 border-t border-[#1f293d]/50">
                   <span className="text-gray-400 font-bold text-xs uppercase">Valor Total Estimado:</span>
                   <span className="text-emerald-400 font-black text-sm font-mono">
-                    {generatingOrderNeed.itens.reduce((sum, item) => {
+                    {mergedItens.reduce((sum, item) => {
                       const price = Number(itemPrices[item.prodId] || 0);
                       return sum + (item.qtd * price);
                     }, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -885,7 +983,7 @@ export default function PurchaseNeedsView() {
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setGeneratingOrderNeed(null)}
+                  onClick={() => setGeneratingOrderNeeds(null)}
                   className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-lg transition-colors"
                 >
                   Cancelar

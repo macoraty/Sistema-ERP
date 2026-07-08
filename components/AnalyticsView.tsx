@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useMemo } from "react";
 import { useErp } from "@/hooks/use-erp";
 import {

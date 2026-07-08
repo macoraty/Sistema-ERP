@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
-import { ErpProvider } from '@/hooks/use-erp';
 import './globals.css';
 
 const inter = Inter({
@@ -22,9 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="bg-[#0b0f17] text-gray-100 antialiased" suppressHydrationWarning>
-        <ErpProvider>
-          {children}
-        </ErpProvider>
+        {children}
       </body>
     </html>
   );

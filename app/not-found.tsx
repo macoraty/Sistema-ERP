@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { AlertCircle } from "lucide-react";
 
 export default function NotFound() {
   return (
@@ -10,7 +8,22 @@ export default function NotFound() {
       <div className="max-w-md w-full space-y-6">
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mb-4">
-            <AlertCircle className="w-8 h-8 text-blue-500 animate-pulse" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-8 h-8 text-blue-500 animate-pulse"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
           </div>
           <h1 className="text-4xl font-black text-white tracking-widest font-mono">404</h1>
           <p className="text-sm uppercase tracking-wider text-gray-400 mt-2 font-semibold">Página Não Encontrada</p>
@@ -20,12 +33,12 @@ export default function NotFound() {
             O recurso que você tentou acessar não foi localizado ou não está disponível no painel do ERP Industrial.
           </p>
         </div>
-        <Link
+        <a
           href="/"
           className="inline-block bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg transition-colors text-xs uppercase tracking-wider shadow-lg shadow-blue-900/20"
         >
           Voltar ao Painel
-        </Link>
+        </a>
       </div>
     </div>
   );

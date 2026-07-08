@@ -622,6 +622,28 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const safeParse = (str: string | null, fallback: any) => {
+      if (!str) return fallback;
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(fallback)) {
+          if (!Array.isArray(parsed)) {
+            console.warn("Expected array from local storage, got:", parsed);
+            return fallback;
+          }
+        } else if (fallback !== null && typeof fallback === "object") {
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+            console.warn("Expected object from local storage, got:", parsed);
+            return fallback;
+          }
+        }
+        return parsed;
+      } catch (e) {
+        console.error("Error parsing local storage value:", e);
+        return fallback;
+      }
+    };
+
     const localProducts = getLocal("erp_products");
     const localBom = getLocal("erp_bom");
     const localContacts = getLocal("erp_contacts");
@@ -639,28 +661,34 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     const localCompanySettings = getLocal("erp_companySettings");
 
     if (localCompanySettings) {
-      setCompanySettingsState(JSON.parse(localCompanySettings));
+      setCompanySettingsState(safeParse(localCompanySettings, initialCompanySettings));
     } else {
       setCompanySettingsState(initialCompanySettings);
       saveLocal("erp_companySettings", initialCompanySettings);
     }
 
     if (localProducts) {
-      const parsed = JSON.parse(localProducts);
-      const hasNewProducts = parsed.some(
-        (p: any) => p.codigo === "PFX-0840" || p.codigo === "PFA-0620",
-      );
-      if (!hasNewProducts) {
-        const merged = [...parsed];
-        initialProducts.forEach((ip) => {
-          if (!merged.some((p: any) => p.codigo === ip.codigo)) {
-            merged.push(ip);
-          }
-        });
-        setProducts(merged);
-        saveLocal("erp_products", merged);
-      } else {
-        setProducts(parsed);
+      try {
+        const parsed = JSON.parse(localProducts);
+        const hasNewProducts = Array.isArray(parsed) && parsed.some(
+          (p: any) => p && (p.codigo === "PFX-0840" || p.codigo === "PFA-0620"),
+        );
+        if (!hasNewProducts) {
+          const merged = Array.isArray(parsed) ? [...parsed] : [];
+          initialProducts.forEach((ip) => {
+            if (!merged.some((p: any) => p && p.codigo === ip.codigo)) {
+              merged.push(ip);
+            }
+          });
+          setProducts(merged);
+          saveLocal("erp_products", merged);
+        } else {
+          setProducts(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse localProducts:", e);
+        setProducts(initialProducts);
+        saveLocal("erp_products", initialProducts);
       }
     } else {
       setProducts(initialProducts);
@@ -668,97 +696,97 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (localBom) {
-      setBom(JSON.parse(localBom));
+      setBom(safeParse(localBom, initialBom));
     } else {
       setBom(initialBom);
       saveLocal("erp_bom", initialBom);
     }
 
     if (localContacts) {
-      setContacts(JSON.parse(localContacts));
+      setContacts(safeParse(localContacts, initialContacts));
     } else {
       setContacts(initialContacts);
       saveLocal("erp_contacts", initialContacts);
     }
 
     if (localSalesOrders) {
-      setSalesOrders(JSON.parse(localSalesOrders));
+      setSalesOrders(safeParse(localSalesOrders, initialSalesOrders));
     } else {
       setSalesOrders(initialSalesOrders);
       saveLocal("erp_salesOrders", initialSalesOrders);
     }
 
     if (localStock) {
-      setStock(JSON.parse(localStock));
+      setStock(safeParse(localStock, initialStock));
     } else {
       setStock(initialStock);
       saveLocal("erp_stock", initialStock);
     }
 
     if (localFinancial) {
-      setFinancialEntries(JSON.parse(localFinancial));
+      setFinancialEntries(safeParse(localFinancial, initialFinancial));
     } else {
       setFinancialEntries(initialFinancial);
       saveLocal("erp_financial", initialFinancial);
     }
 
     if (localPurchase) {
-      setPurchaseOrders(JSON.parse(localPurchase));
+      setPurchaseOrders(safeParse(localPurchase, initialPurchaseOrders));
     } else {
       setPurchaseOrders(initialPurchaseOrders);
       saveLocal("erp_purchaseOrders", initialPurchaseOrders);
     }
 
     if (localEntryInvoices) {
-      setEntryInvoices(JSON.parse(localEntryInvoices));
+      setEntryInvoices(safeParse(localEntryInvoices, initialEntryInvoices));
     } else {
       setEntryInvoices(initialEntryInvoices);
       saveLocal("erp_entryInvoices", initialEntryInvoices);
     }
 
     if (localOutboundInvoices) {
-      setOutboundInvoices(JSON.parse(localOutboundInvoices));
+      setOutboundInvoices(safeParse(localOutboundInvoices, initialOutboundInvoices));
     } else {
       setOutboundInvoices(initialOutboundInvoices);
       saveLocal("erp_outboundInvoices", initialOutboundInvoices);
     }
 
     if (localMrp) {
-      setMrpRequirements(JSON.parse(localMrp));
+      setMrpRequirements(safeParse(localMrp, initialMrp));
     } else {
       setMrpRequirements(initialMrp);
       saveLocal("erp_mrp", initialMrp);
     }
 
     if (localAlerts) {
-      setAlerts(JSON.parse(localAlerts));
+      setAlerts(safeParse(localAlerts, initialAlerts));
     } else {
       setAlerts(initialAlerts);
       saveLocal("erp_alerts", initialAlerts);
     }
 
     if (localUsers) {
-      setUsers(JSON.parse(localUsers));
+      setUsers(safeParse(localUsers, initialUsers));
     } else {
       setUsers(initialUsers);
       saveLocal("erp_users", initialUsers);
     }
 
     if (localPurchaseNeeds) {
-      setPurchaseNeeds(JSON.parse(localPurchaseNeeds));
+      setPurchaseNeeds(safeParse(localPurchaseNeeds, []));
     } else {
       setPurchaseNeeds([]);
     }
 
     if (localQuotes) {
-      setQuotes(JSON.parse(localQuotes));
+      setQuotes(safeParse(localQuotes, []));
     } else {
       setQuotes([]);
     }
 
     const localUnidades = getLocal("erp_unidadesMedida");
     if (localUnidades) {
-      setUnidadesMedida(JSON.parse(localUnidades));
+      setUnidadesMedida(safeParse(localUnidades, initialUnidadesMedida));
     } else {
       setUnidadesMedida(initialUnidadesMedida);
       saveLocal("erp_unidadesMedida", initialUnidadesMedida);
@@ -775,7 +803,7 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     const prefixedTemplatesKey = getPrefixedKey("erp_printTemplates", dbProfile);
     const localTemplates = prefixedTemplatesKey ? localStorage.getItem(prefixedTemplatesKey) : null;
     if (localTemplates) {
-      setPrintTemplates(JSON.parse(localTemplates));
+      setPrintTemplates(safeParse(localTemplates, {}));
     } else {
       setPrintTemplates({});
     }

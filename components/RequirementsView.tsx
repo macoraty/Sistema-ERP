@@ -30,7 +30,7 @@ export default function RequirementsView() {
   } = useErp();
 
   const [filterStatus, setFilterStatus] = useState('Todos');
-  const [selectedReqId, setSelectedReqId] = useState<number | null>(null);
+  const [selectedReqIds, setSelectedReqIds] = useState<number[]>([]);
 
   // Sorting State
   const [sortField, setSortField] = useState<string | null>(null);
@@ -48,16 +48,10 @@ export default function RequirementsView() {
   // Purchase Order Generation State
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [selectedFornecedorId, setSelectedFornecedorId] = useState<number>(0);
-  const [purchaseQty, setPurchaseQty] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState('');
+  const [purchaseItems, setPurchaseItems] = useState<{ prodId: number; qty: string; price: string }[]>([]);
 
   // Dropdowns for modal
   const suppliers = useMemo(() => contacts.filter(c => c.tipo === 'Fornecedor'), [contacts]);
-
-  // Current requirement detail when generating purchase order
-  const activeReq = useMemo(() => {
-    return mrpRequirements.find(r => r.id === selectedReqId);
-  }, [mrpRequirements, selectedReqId]);
 
   // Auto-fill homologous supplier based on product code
   const autoHomologousSupplier = (prodCode: string): number => {
@@ -70,28 +64,42 @@ export default function RequirementsView() {
     return suppliers.length > 0 ? suppliers[0].id : 0;
   };
 
-  const handleOpenPurchaseModal = (reqId: number) => {
-    setSelectedReqId(reqId);
-    const req = mrpRequirements.find(r => r.id === reqId);
-    if (req) {
-      const prod = products.find(p => p.id === req.prodId);
-      setPurchaseQty(String(req.qtdNecessaria));
-      setPurchasePrice(prod ? String(prod.valor) : '0');
-      setSelectedFornecedorId(autoHomologousSupplier(prod ? prod.codigo : ''));
-    }
+  const handleOpenPurchaseModal = (reqIds: number[]) => {
+    setSelectedReqIds(reqIds);
+    const reqs = mrpRequirements.filter(r => reqIds.includes(r.id));
+    
+    // Group by prodId
+    const itemMap: Record<number, { qty: number, price: number }> = {};
+    let suggestedSupplier = 0;
+
+    reqs.forEach(req => {
+      if (!itemMap[req.prodId]) {
+        const prod = products.find(p => p.id === req.prodId);
+        itemMap[req.prodId] = { qty: 0, price: prod ? (prod.valor || 0) : 0 };
+        if (suggestedSupplier === 0 && prod) {
+           suggestedSupplier = autoHomologousSupplier(prod.codigo);
+        }
+      }
+      itemMap[req.prodId].qty += req.qtdNecessaria;
+    });
+
+    const newPurchaseItems = Object.entries(itemMap).map(([prodId, data]) => ({
+      prodId: Number(prodId),
+      qty: String(data.qty),
+      price: String(data.price),
+    }));
+
+    setPurchaseItems(newPurchaseItems);
+    setSelectedFornecedorId(suggestedSupplier);
     setIsPurchaseModalOpen(true);
   };
 
   const handleGeneratePurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeReq || !selectedFornecedorId || !purchaseQty || !purchasePrice) {
+    if (!selectedFornecedorId || purchaseItems.length === 0) {
       alert('Preencha as informações de suprimento.');
       return;
     }
-
-    const prodId = activeReq.prodId;
-    const qty = parseFloat(purchaseQty);
-    const price = parseFloat(purchasePrice);
 
     // Format delivery date (approx lead time business days, say 5 days)
     const delivery = new Date();
@@ -100,18 +108,25 @@ export default function RequirementsView() {
     const mStr = String(delivery.getMonth() + 1).padStart(2, '0');
     const yStr = delivery.getFullYear();
 
+    const orderItems = purchaseItems.map(item => ({
+      prodId: item.prodId,
+      qtd: parseFloat(item.qty) || 0,
+      valorUnitario: parseFloat(item.price) || 0
+    }));
+
+    const total = orderItems.reduce((acc, item) => acc + (item.qtd * item.valorUnitario), 0);
+
     // Create Purchase Order
     savePurchaseOrder({
       fornecedorId: selectedFornecedorId,
       dataEmissao: getTodayFormatted(),
       dataEntrega: `${dStr}/${mStr}/${yStr}`,
-      itens: [{ prodId, qtd: qty, valorUnitario: price }],
-      valorTotal: qty * price,
+      itens: orderItems,
+      valorTotal: total,
       status: 'Aberto'
     });
 
-    // Mark requirement status or recalculate after order creation
-    // To keep it simple, we let the user re-run MRP to clear outfulfilled demands
+    setSelectedReqIds([]);
     setIsPurchaseModalOpen(false);
   };
 
@@ -121,6 +136,35 @@ export default function RequirementsView() {
       return r.status === filterStatus;
     });
   }, [mrpRequirements, filterStatus]);
+
+  const selectableReqs = useMemo(() => {
+    return filteredRequirements.filter(r => r.status !== 'Comprado');
+  }, [filteredRequirements]);
+
+  const toggleSelectReq = (id: number) => {
+    setSelectedReqIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllToggle = () => {
+    const selectableIds = selectableReqs.map(r => r.id);
+    const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedReqIds.includes(id));
+
+    if (allSelected) {
+      setSelectedReqIds(prev => prev.filter(id => !selectableIds.includes(id)));
+    } else {
+      setSelectedReqIds(prev => {
+        const next = [...prev];
+        selectableIds.forEach(id => {
+          if (!next.includes(id)) {
+            next.push(id);
+          }
+        });
+        return next;
+      });
+    }
+  };
 
   const sortedRequirements = useMemo(() => {
     if (!sortField) return filteredRequirements;
@@ -214,19 +258,30 @@ export default function RequirementsView() {
 
         {/* List of calculated requirements */}
         <div className="lg:col-span-3 bg-[#111827] border border-[#1f293d] rounded-xl overflow-hidden shadow-lg">
-          <div className="p-4 bg-[#0f1523] border-b border-[#1f293d] flex justify-between items-center">
+          <div className="p-4 bg-[#0f1523] border-b border-[#1f293d] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <span className="font-bold text-white text-xs">Necessidades Líquidas de Suprimentos</span>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-3.5 h-3.5 text-gray-500" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-[#0b0f17] border border-[#1f293d] rounded p-1 text-[10px] text-gray-300"
-              >
-                <option value="Todos">Todos os Status</option>
-                <option value="Pendente">Apenas Pendentes</option>
-                <option value="Comprado">Saldados / Emitidos</option>
-              </select>
+            <div className="flex flex-wrap items-center gap-3">
+              {selectedReqIds.length > 0 && (
+                <button
+                  onClick={() => handleOpenPurchaseModal(selectedReqIds)}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-3 py-1.5 rounded flex items-center space-x-1 transition-colors shadow-lg shadow-emerald-500/10"
+                >
+                  <ShoppingCart className="w-3 h-3" />
+                  <span>Gerar Pedido dos Selecionados ({selectedReqIds.length})</span>
+                </button>
+              )}
+              <div className="flex items-center space-x-2">
+                <Filter className="w-3.5 h-3.5 text-gray-500" />
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-[#0b0f17] border border-[#1f293d] rounded p-1 text-[10px] text-gray-300"
+                >
+                  <option value="Todos">Todos os Status</option>
+                  <option value="Pendente">Apenas Pendentes</option>
+                  <option value="Comprado">Saldados / Emitidos</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -234,6 +289,14 @@ export default function RequirementsView() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#0f1523]/50 border-b border-[#1f293d] text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                  <th className="py-2.5 px-4 text-center select-none" style={{ width: '50px' }}>
+                    <input 
+                      type="checkbox"
+                      checked={selectableReqs.length > 0 && selectableReqs.every(r => selectedReqIds.includes(r.id))}
+                      onChange={handleSelectAllToggle}
+                      className="rounded border-[#1f293d] bg-[#0b0f17] text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer w-3.5 h-3.5"
+                    />
+                  </th>
                   <th 
                     className="py-2.5 px-4 cursor-pointer hover:text-white transition-colors"
                     onClick={() => toggleSort('codigo')}
@@ -296,6 +359,22 @@ export default function RequirementsView() {
 
                   return (
                     <tr key={r.id} className="hover:bg-gray-800/20 transition-colors">
+                      <td className="py-3 px-4 text-center select-none">
+                        {!isComp ? (
+                          <input 
+                            type="checkbox"
+                            checked={selectedReqIds.includes(r.id)}
+                            onChange={() => toggleSelectReq(r.id)}
+                            className="rounded border-[#1f293d] bg-[#0b0f17] text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer w-3.5 h-3.5"
+                          />
+                        ) : (
+                          <input 
+                            type="checkbox"
+                            disabled
+                            className="rounded border-[#1f293d] bg-[#0b0f17] opacity-20 cursor-not-allowed w-3.5 h-3.5"
+                          />
+                        )}
+                      </td>
                       <td className="py-3 px-4">
                         <span className="font-mono font-bold text-white text-[10px] block">{prod ? prod.codigo : 'SKU'}</span>
                         <span className="text-gray-400 text-[11px] block truncate max-w-xs">{prod ? prod.descricao : 'Material'}</span>
@@ -312,7 +391,7 @@ export default function RequirementsView() {
                       <td className="py-3 px-4 text-center">
                         {!isComp ? (
                           <button
-                            onClick={() => handleOpenPurchaseModal(r.id)}
+                            onClick={() => handleOpenPurchaseModal([r.id])}
                             className="bg-[#1f293d] hover:bg-blue-600 border border-[#243049] hover:border-blue-500 text-white font-bold text-[10px] px-2.5 py-1.5 rounded flex items-center space-x-1 mx-auto transition-colors"
                           >
                             <ShoppingCart className="w-3 h-3" />
@@ -330,7 +409,7 @@ export default function RequirementsView() {
                 })}
                 {filteredRequirements.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-500 font-semibold leading-relaxed">
+                    <td colSpan={6} className="py-12 text-center text-gray-500 font-semibold leading-relaxed">
                       Nenhuma necessidade calculada.<br />
                       <span className="text-[10px] font-normal text-gray-600">Aperte em &quot;Rodar Cálculo de Necessidades&quot; para atualizar.</span>
                     </td>
@@ -344,18 +423,22 @@ export default function RequirementsView() {
       </div>
 
       {/* Auto-Purchase Order generator Modal */}
-      {isPurchaseModalOpen && activeReq && (
+      {isPurchaseModalOpen && purchaseItems.length > 0 && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setIsPurchaseModalOpen(false) }}
         >
-          <div className="bg-[#111827] border border-[#1f293d] rounded-xl w-full max-w-xl overflow-hidden shadow-2xl animate-scale-up">
+          <div className="bg-[#111827] border border-[#1f293d] rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl animate-scale-up">
             
             {/* Modal Header */}
             <div className="bg-[#0f1523] px-5 py-4 flex justify-between items-center border-b border-[#1f293d]">
               <h3 className="font-bold text-sm text-white flex items-center space-x-2">
                 <ShoppingCart className="w-4 h-4 text-blue-400" />
-                <span>Geração de Pedido de Compra Automatizado</span>
+                <span>
+                  {selectedReqIds.length === 1 
+                    ? 'Geração de Pedido de Compra Automatizado' 
+                    : `Geração de Pedido de Compra (${selectedReqIds.length} necessidades)`}
+                </span>
               </h3>
               <button onClick={() => setIsPurchaseModalOpen(false)} className="text-gray-400 hover:text-white">
                 <X className="w-4 h-4" />
@@ -365,16 +448,6 @@ export default function RequirementsView() {
             {/* Modal Form */}
             <form onSubmit={handleGeneratePurchase} className="p-5 space-y-4 text-xs">
               
-              <div className="p-3.5 bg-blue-500/5 rounded-xl border border-blue-500/10 space-y-1">
-                <span className="text-gray-500 uppercase font-black text-[9px]">Análise do Déficit</span>
-                <p className="text-gray-100 font-semibold">
-                  Produto: <b className="text-white font-bold font-mono">[{products.find(p => p.id === activeReq.prodId)?.codigo}]</b> {products.find(p => p.id === activeReq.prodId)?.descricao}
-                </p>
-                <p className="text-rose-400 font-medium">
-                  Quantidade sugerida em déficit: {activeReq.qtdNecessaria} {products.find(p => p.id === activeReq.prodId)?.unidade}
-                </p>
-              </div>
-
               <div>
                 <label className="block text-gray-400 font-bold mb-1">Fornecedor Homologado / Sugerido</label>
                 <select
@@ -388,35 +461,78 @@ export default function RequirementsView() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-400 font-bold mb-1">Qtd. a Comprar</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    value={purchaseQty}
-                    onChange={(e) => setPurchaseQty(e.target.value)}
-                    className="w-full bg-[#0b0f17] border border-[#1f293d] rounded-lg p-2.5 text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 font-bold mb-1">Preço Acordado Unitário (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={purchasePrice}
-                    onChange={(e) => setPurchasePrice(e.target.value)}
-                    className="w-full bg-[#0b0f17] border border-[#1f293d] rounded-lg p-2.5 text-white font-mono"
-                  />
+              <div className="bg-[#0b0f17] p-4 rounded-xl border border-[#1f293d] space-y-3">
+                <h4 className="font-bold text-white text-xs flex items-center space-x-2 border-b border-[#1f293d]/50 pb-2">
+                  <ShoppingCart className="w-4 h-4 text-blue-400" />
+                  <span>Itens do Pedido</span>
+                </h4>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[11px] text-gray-400">
+                    <thead>
+                      <tr className="border-b border-[#1f293d]/50 text-gray-500 uppercase font-black text-[9px]">
+                        <th className="py-2">Insumo</th>
+                        <th className="py-2 text-center">Unidade</th>
+                        <th className="py-2 text-right">Qtd a Comprar</th>
+                        <th className="py-2 text-center" style={{ width: '130px' }}>Unitário (R$)</th>
+                        <th className="py-2 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1f293d]/30 text-gray-300">
+                      {purchaseItems.map((item, index) => {
+                        const p = products.find(prod => prod.id === item.prodId);
+                        const subVal = (parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0);
+
+                        return (
+                          <tr key={index}>
+                            <td className="py-2">
+                              <span className="font-mono text-blue-400 font-bold mr-1">[{p?.codigo}]</span>
+                              <span className="font-bold text-white">{p?.descricao}</span>
+                            </td>
+                            <td className="py-2 text-center text-gray-500 font-mono uppercase">{p?.unidade || 'UN'}</td>
+                            <td className="py-2 text-right">
+                              <input
+                                type="number"
+                                step="any"
+                                required
+                                value={item.qty}
+                                onChange={(e) => {
+                                  const newItems = [...purchaseItems];
+                                  newItems[index].qty = e.target.value;
+                                  setPurchaseItems(newItems);
+                                }}
+                                className="w-20 bg-[#111827] border border-[#1f293d] px-2 py-1 rounded text-white font-mono text-right text-xs focus:outline-none focus:border-blue-500 ml-auto"
+                              />
+                            </td>
+                            <td className="py-2 text-center">
+                              <input
+                                type="number"
+                                required
+                                step="0.01"
+                                value={item.price}
+                                onChange={(e) => {
+                                  const newItems = [...purchaseItems];
+                                  newItems[index].price = e.target.value;
+                                  setPurchaseItems(newItems);
+                                }}
+                                className="w-full bg-[#111827] border border-[#1f293d] px-2 py-1 rounded text-white font-mono text-center text-xs focus:outline-none focus:border-blue-500"
+                              />
+                            </td>
+                            <td className="py-2 text-right font-mono text-blue-400 font-bold">
+                              {subVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
               <div className="p-3 bg-gray-800/30 rounded-lg flex justify-between items-center">
                 <span className="font-bold text-gray-400">Total do Pedido:</span>
                 <span className="font-mono text-base font-black text-emerald-400">
-                  {((parseFloat(purchaseQty) || 0) * (parseFloat(purchasePrice) || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {purchaseItems.reduce((acc, item) => acc + ((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0)), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
 

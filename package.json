@@ -4,15 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "build": "rm -rf .next out dist && NODE_ENV=production next build && mv out dist && rm -rf .next",
+    "lint": "eslint ."
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "motion": "^11.11.17",
-    "next": "15.1.0",
+    "next": "^15.5.20",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "recharts": "^2.15.0",
